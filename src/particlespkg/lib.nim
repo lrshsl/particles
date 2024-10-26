@@ -1,4 +1,8 @@
-import nimraylib_now
+import math
+
+from nimraylib_now import getScreenWidth, getScreenHeight, drawCircleLines, beginDrawing, clearBackground, Black, Color,
+  isMouseButtonPressed, isMouseButtonDown, MouseButton, getMousePosition, checkCollisionPointCircle,
+  clamp, clampValue, drawFPS, initWindow, setTargetFPS, windowShouldClose, isKeyDown, KeyboardKey
 
 import std/[sugar, sequtils, random]
 
@@ -14,31 +18,23 @@ const
 # endsection Consts
 
 # startsection Vector helpers
-func vecsToRectangle(pos, size: Vector2): Rectangle =
-  Rectangle(
-      x: pos.x,
-      y: pos.y,
-      width: size.x,
-      height: size.y)
-
 type
   IVec2 = object
     x, y: cint
 
-func vec2(x, y: cfloat): Vector2 = Vector2(x: x, y: y)
 func ivec2(x, y: cint): IVec2 = IVec2(x: x, y: y)
 
 func getScreenSize(): IVec2 =
   ivec2(getScreenWidth(), getScreenHeight())
 
-func asVec2(v: IVec2): Vector2 = vec2(v.x.cfloat, v.y.cfloat)
+func asVec2(v: IVec2): Vec2 = vec2(v.x.cfloat, v.y.cfloat)
 
 # endsection
 
 # startsection Body
 type
   Body = object
-    pos, vel, acc: Vector2
+    pos, vel, acc: Vec2
     radius: float
     mass: float
     color: Color
@@ -57,15 +53,15 @@ proc collide(a, b: var Body) =
 
   # Calculate the normal and tangent vectors
   let
-    collision_axis = (b.pos - a.pos).normalize
+    collision_axis = (b.pos - a.pos).norm
     tangent_axis = collision_axis.rotate(90)
 
   # Project velocities onto the normal and tangent vectors
   let
-    a_normal_vel = a.vel.dotProduct(collision_axis)
-    b_normal_vel = b.vel.dotProduct(collision_axis)
-    a_tangent_vel = a.vel.dotProduct(tangent_axis)
-    b_tangent_vel = b.vel.dotProduct(tangent_axis)
+    a_normal_vel = a.vel.dot(collision_axis)
+    b_normal_vel = b.vel.dot(collision_axis)
+    a_tangent_vel = a.vel.dot(tangent_axis)
+    b_tangent_vel = b.vel.dot(tangent_axis)
 
   # Conservation of momentum for normal components (elastic collision)
   let
@@ -81,7 +77,7 @@ proc collide(a, b: var Body) =
   b.vel = tangent_axis * b_tangent_vel + collision_axis * b_normal_vel_after
 
 
-proc reflectFromWalls(body: var Body, bounds_min, bounds_max: Vector2) =
+proc reflectFromWalls(body: var Body, bounds_min, bounds_max: Vec2) =
   if body.pos.x < bounds_min.x:
     body.vel.x = abs(body.vel.x)
   elif body.pos.x > bounds_max.x:
@@ -94,23 +90,22 @@ proc reflectFromWalls(body: var Body, bounds_min, bounds_max: Vector2) =
 
 let
   Gravity = vec2(0, 9.81) * Factor
-  F = Color()
 
 proc process(bodies: var seq[Body], body: var Body) =
-  if isMouseButtonPressed(MouseButton.LEFT) and getMousePosition().checkCollisionPointCircle(body.pos, body.radius):
+  if isMouseButtonPressed(MouseButton.LEFT.cint) and getMousePosition().checkCollisionPointCircle(body.pos.raylib, body.radius):
     body.is_being_dragged = true
-  if not isMouseButtonDown(MouseButton.LEFT):
+  if not isMouseButtonDown(MouseButton.LEFT.cint):
     body.is_being_dragged = false
 
   if body.is_being_dragged:
-    body.vel = (getMousePosition() - body.pos).clampValue(0, MaxSpeed)
+    body.vel = (getMousePosition().vec2 - body.pos).raylib.clampValue(0.0, MaxSpeed).vec2
 
   let
     screen_bounds_min = vec2(body.radius, body.radius)
-    screen_bounds_max = getScreenSize().asVec2 - vec2(body.radius, body.radius)
+    screen_bounds_max = (getScreenSize().asVec2 - vec2(body.radius, body.radius))
 
-  body.acc = (Gravity - (body.vel * AirDrag)).clampValue(0, MaxAcceleration)
-  body.vel = (body.vel + body.acc).clampValue(0, MaxSpeed)
+  body.acc = (Gravity - (body.vel * AirDrag)).raylib.clampValue(0, MaxAcceleration).vec2
+  body.vel = (body.vel + body.acc).raylib.clampValue(0, MaxSpeed).vec2
   body.pos += body.vel
 
   # Interactions
@@ -119,7 +114,7 @@ proc process(bodies: var seq[Body], body: var Body) =
     if other != body:
       body.collide(other)
 
-  body.pos = body.pos.clamp(screen_bounds_min, screen_bounds_max)
+  body.pos = body.pos.raylib.clamp(screen_bounds_min.raylib, screen_bounds_max.raylib).vec2
 
 proc draw(body: Body) =
   clearBackground(Black)
@@ -141,8 +136,8 @@ proc generateBody(): Body =
         rand(r.cint..(getScreenWidth() - r.cint)),
         rand(r.cint..(getScreenHeight() - r.cint))
   ).asVec2
-  result.vel = vector2Zero()
-  result.acc = vector2Zero()
+  result.vel = vec2(0, 0)
+  result.acc = vec2(0, 0)
   result.mass = r
   result.color = randomColor()
   result.is_being_dragged = false
@@ -156,12 +151,11 @@ proc run*() =
       for _ in 0..<NumberParticles:
         generateBody()
 
-  while not (isKeyDown(Q) or windowShouldClose()):
+  while not (isKeyDown(Q.cint) or windowShouldClose()):
 
     bodies.apply((body: var Body) => process(bodies, body))
 
     beginDrawing:
       bodies.apply(draw)
-
 
 # vim: fmr=startsection,endsection
