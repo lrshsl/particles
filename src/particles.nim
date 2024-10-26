@@ -1,4 +1,4 @@
-from particles/lib import run
+from particlespkg/lib import run
 
 when isMainModule:
   run()
