@@ -6,7 +6,7 @@ import std/[sugar, sequtils, random]
 const
   Factor = 0.01
   AirDrag = 0.01
-  RadiusRange = 10.0..30.0
+  RadiusRange = 10.0..50.0
   MaxSpeed = 40.0
   MaxAcceleration = 0.5
   NumberParticles = 10
@@ -51,10 +51,6 @@ proc collide(a, b: var Body) =
   if (a.pos - b.pos).lengthSqr >= ((a.radius + b.radius) * (a.radius + b.radius)):
     return
 
-  # Set colors to indicate a collision has occurred
-  a.color = Red
-  b.color = Red
-
   # step back (--> not intersecting anymore)
   a.pos -= a.vel
   b.pos -= b.vel
@@ -98,6 +94,7 @@ proc reflectFromWalls(body: var Body, bounds_min, bounds_max: Vector2) =
 
 let
   Gravity = vec2(0, 9.81) * Factor
+  F = Color()
 
 proc process(bodies: var seq[Body], body: var Body) =
   if isMouseButtonPressed(MouseButton.LEFT) and getMousePosition().checkCollisionPointCircle(body.pos, body.radius):
@@ -118,7 +115,6 @@ proc process(bodies: var seq[Body], body: var Body) =
 
   # Interactions
   body.reflectFromWalls(screen_bounds_min, screen_bounds_max)
-  body.color = Green
   for other in bodies.mitems:
     if other != body:
       body.collide(other)
@@ -130,16 +126,25 @@ proc draw(body: Body) =
   drawCircleLines(body.pos.x.cint, body.pos.y.cint, body.radius, body.color)
   drawFPS(0, 0)
 
+proc randomColor(): Color =
+  Color(
+      r: rand(100..255).uint8,
+      g: rand(100..255).uint8,
+      b: rand(100..255).uint8,
+      a: 255
+  )
+
 proc generateBody(): Body =
-  result.radius = rand(RadiusRange)
+  let r = rand(RadiusRange)
+  result.radius = r
   result.pos = ivec2(
-        rand(result.radius.cint..(getScreenWidth() - result.radius.cint)),
-        rand(result.radius.cint..(getScreenHeight() - result.radius.cint))
+        rand(r.cint..(getScreenWidth() - r.cint)),
+        rand(r.cint..(getScreenHeight() - r.cint))
   ).asVec2
   result.vel = vector2Zero()
   result.acc = vector2Zero()
-  result.mass = result.radius
-  result.color = Green
+  result.mass = r
+  result.color = randomColor()
   result.is_being_dragged = false
 
 proc run*() =
